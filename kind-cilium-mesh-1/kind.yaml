@@ -5,6 +5,7 @@ networking:
   disableDefaultCNI: true
   podSubnet: 10.1.0.0/16
   serviceSubnet: 172.20.1.0/24
+  kubeProxyMode: none
 nodes:
   - image: kindest/node:v1.21.2
     role: control-plane

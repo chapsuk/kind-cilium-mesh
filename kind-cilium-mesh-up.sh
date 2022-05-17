@@ -5,7 +5,7 @@ set -euo pipefail
 KUBE_SYSTEM_NAMESPACE="kube-system"
 
 CILIUM_NAMESPACE="${KUBE_SYSTEM_NAMESPACE}"
-CILIUM_VERSION="v1.11.0-rc3"
+CILIUM_VERSION="v1.11.3"
 CLUSTER_NAME_PREFIX="kind-cilium-mesh-"
 CLUSTER_1_NAME="${CLUSTER_NAME_PREFIX}1"
 CLUSTER_1_CONTEXT="kind-${CLUSTER_1_NAME}"
@@ -26,9 +26,23 @@ kind create cluster --name "${CLUSTER_2_NAME}" --config "${CLUSTER_2_NAME}/kind.
 
 info "Installing Cilium...."
 kubectl config use "${CLUSTER_1_CONTEXT}"
-cilium install --cluster-name "${CLUSTER_1_NAME}" --cluster-id "${CLUSTER_1_NAME/${CLUSTER_NAME_PREFIX}/}" --ipam kubernetes --version "${CILIUM_VERSION}"
+cilium install \
+    --cluster-name "${CLUSTER_1_NAME}" \
+    --cluster-id "${CLUSTER_1_NAME/${CLUSTER_NAME_PREFIX}/}" \
+    --ipam kubernetes \
+    --version "${CILIUM_VERSION}" \
+    --kube-proxy-replacement strict \
+    --helm-set-string "k8sServiceHost=kind-cilium-mesh-1-control-plane,k8sServicePort=6443"
+
 kubectl config use "${CLUSTER_2_CONTEXT}"
-cilium install --cluster-name "${CLUSTER_2_NAME}" --cluster-id "${CLUSTER_2_NAME/${CLUSTER_NAME_PREFIX}/}" --ipam kubernetes --version "${CILIUM_VERSION}" --inherit-ca "${CLUSTER_1_CONTEXT}"
+cilium install \
+    --cluster-name "${CLUSTER_2_NAME}" \
+    --cluster-id "${CLUSTER_2_NAME/${CLUSTER_NAME_PREFIX}/}" \
+    --ipam kubernetes \
+    --version "${CILIUM_VERSION}" \
+    --kube-proxy-replacement strict \
+    --helm-set-string "k8sServiceHost=kind-cilium-mesh-2-control-plane,k8sServicePort=6443" \
+    --inherit-ca "${CLUSTER_1_CONTEXT}"
 
 info "Creating the cluster mesh..."
 cilium clustermesh enable --context "${CLUSTER_1_CONTEXT}" --service-type NodePort
@@ -39,10 +53,10 @@ cilium clustermesh connect --context "${CLUSTER_1_CONTEXT}" --destination-contex
 cilium clustermesh status --context "${CLUSTER_1_CONTEXT}" --wait
 cilium clustermesh status --context "${CLUSTER_2_CONTEXT}" --wait
 
-info "Deploying the test application..."
-kubectl config use "${CLUSTER_1_CONTEXT}"
-kubectl apply -f "${ROOT}/common/rebel-base.yaml" -f "https://raw.githubusercontent.com/cilium/cilium/${CILIUM_VERSION}/examples/kubernetes/clustermesh/global-service-example/cluster1.yaml"
-kubectl config use "${CLUSTER_2_CONTEXT}"
-kubectl apply -f "${ROOT}/common/rebel-base.yaml" -f "https://raw.githubusercontent.com/cilium/cilium/${CILIUM_VERSION}/examples/kubernetes/clustermesh/global-service-example/cluster2.yaml"
+# info "Deploying the test application..."
+# kubectl config use "${CLUSTER_1_CONTEXT}"
+# kubectl apply -f "${ROOT}/common/rebel-base.yaml" -f "https://raw.githubusercontent.com/cilium/cilium/${CILIUM_VERSION}/examples/kubernetes/clustermesh/global-service-example/cluster1.yaml"
+# kubectl config use "${CLUSTER_2_CONTEXT}"
+# kubectl apply -f "${ROOT}/common/rebel-base.yaml" -f "https://raw.githubusercontent.com/cilium/cilium/${CILIUM_VERSION}/examples/kubernetes/clustermesh/global-service-example/cluster2.yaml"
 
 popd > /dev/null
